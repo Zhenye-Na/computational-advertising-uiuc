@@ -80,7 +80,7 @@ Each user receives the same hub-score after K=10 iterations, thus they are sorte
 
 **Sample Output 1**
 
-````
+```
 12,2100,387
 10897,21443,38976
 ```
