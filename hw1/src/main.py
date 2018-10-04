@@ -1,3 +1,12 @@
+"""
+Implementation of HITS algorithm.
+
+ref: https://en.wikipedia.org/wiki/HITS_algorithm
+
+@date: Sep 24, 2018
+@author: Zhenye Na
+"""
+
 import sys
 
 
