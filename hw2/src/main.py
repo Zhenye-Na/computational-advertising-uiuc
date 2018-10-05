@@ -28,27 +28,47 @@ def simple_simrank(users, ads, users_sim_scores, ads_sim_scores, users_partial_s
     """
     # memoization for ads partial sum
     for users_key, users_score_val in users_sim_scores.items():
-        users_key_array = users_key.split(",")
-        users_key_array = [float(i) for i in users_key_array]
+        user_list = users.keys()
 
-        for q_prime_neighbors in users[users_key_array[1]]:
+        for q_prime in user_list:
             similarity_score = 0.
-            for q_neighbors in users[users_key_array[0]]:
-                similarity_score += ads_sim_scores["{},{}".format(q_neighbors, q_prime_neighbors)]
-            ads_partial_sum[q_prime_neighbors] = similarity_score
+            for q in user_list:
+                similarity_score += ads_sim_scores["{},{}".format(q, q_prime)]
+            ads_partial_sum[q_prime] = similarity_score
 
     # memoization for users partial sum
     for ads_key, ads_score_val in ads_sim_scores.items():
-        ads_key_array = ads_key.split(",")
-        ads_key_array = [float(i) for i in ads_key_array]
+        ad_list = ads.keys()
 
-        for a_prime_neighbors in ads[ads_key_array[1]]:
+        for a_prime in ad_list:
             similarity_score = 0.
-            for a_neighbors in ads[ads_key_array[0]]:
-                similarity_score += users_sim_scores["{},{}".format(a_neighbors, a_prime_neighbors)]
-            users_partial_sum[a_prime_neighbors] = similarity_score
+            for a in ad_list:
+                similarity_score += users_sim_scores["{},{}".format(a, a_prime)]
+            users_partial_sum[a_prime] = similarity_score
 
 
+    # for users_key, users_score_val in users_sim_scores.items():
+    #     users_key_array = users_key.split(",")
+    #     users_key_array = [float(i) for i in users_key_array]
+    #
+    #     for q_prime_neighbors in users[users_key_array[1]]:
+    #         similarity_score = 0.
+    #         for q_neighbors in users[users_key_array[0]]:
+    #             similarity_score += ads_sim_scores["{},{}".format(q_neighbors, q_prime_neighbors)]
+    #         ads_partial_sum[q_prime_neighbors] = similarity_score
+
+    # # memoization for users partial sum
+    # for ads_key, ads_score_val in ads_sim_scores.items():
+    #     ads_key_array = ads_key.split(",")
+    #     ads_key_array = [float(i) for i in ads_key_array]
+    #
+    #     for a_prime_neighbors in ads[ads_key_array[1]]:
+    #         similarity_score = 0.
+    #         for a_neighbors in ads[ads_key_array[0]]:
+    #             similarity_score += users_sim_scores["{},{}".format(a_neighbors, a_prime_neighbors)]
+    #         users_partial_sum[a_prime_neighbors] = similarity_score
+
+    # update process
     for i in range(k):
         # Eq. 4.1
         for users_key, users_score_val in users_sim_scores.items():
@@ -145,9 +165,15 @@ if __name__ == '__main__':
     # partial sum memoization for ads
     ads_partial_sum = {}
 
+    user_list = []
+    ad_list = []
+
     for _ in range(num_of_links):
         line = sys.stdin.readline().split(",")
         line_array = [float(i) for i in line]
+
+        user_list.append(line_array[0])
+        ad_list.append(line_array[1])
 
         if line_array[0] in users:
             users[line_array[0]].append(line_array[1])
@@ -155,8 +181,8 @@ if __name__ == '__main__':
             users[line_array[0]] = [line_array[1]]
 
         users_sim_scores["{},{}".format(line_array[0], line_array[0])] = 1.
-        users_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
-        users_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
+        # users_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
+        # users_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
 
         if line_array[1] in ads:
             ads[line_array[1]].append(line_array[0])
@@ -164,10 +190,20 @@ if __name__ == '__main__':
             ads[line_array[1]] = [line_array[0]]
 
         ads_sim_scores["{},{}".format(line_array[1], line_array[1])] = 1.
-        ads_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
-        ads_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
+        # ads_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
+        # ads_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
 
         weights["{},{}".format(line_array[0], line_array[1])] = line_array[2]
+
+    for q in user_list:
+        for q_prime in user_list:
+            users_sim_scores["{},{}".format(q, q_prime)] = 0.
+            users_sim_scores["{},{}".format(q_prime, q)] = 0.
+
+    for a in ad_list:
+        for a_prime in ad_list:
+            ads_sim_scores["{},{}".format(a, a_prime)] = 0.
+            ads_sim_scores["{},{}".format(a_prime, a)] = 0.
 
 
     # query user and ad
