@@ -12,18 +12,21 @@ import numpy
 from numpy import matrix
 
 
-num_of_links = int(sys.stdin.readline())
+num_of_links = 1000
 
 logs = []
 
-for _ in range(num_of_links):
-    log = sys.stdin.readline().strip()
-    logs.append(log)
+# for _ in range(num_of_links):
+#     log = sys.stdin.readline().strip()
+#     logs.append(log)
 
-query = sys.stdin.readline().strip().split(",")
-query_user = query[0]
-query_ad = query[1]
+with open('../data/large_sample2.txt', 'r') as log_fp:
+    logs = [ log.strip() for log in log_fp.readlines() ]
 
+# query = sys.stdin.readline().strip().split(",")
+# 896,6
+query_user = "896"
+query_ad = "6"
 
 logs_tuple = [tuple(log.split(",")) for log in logs]
 
@@ -51,16 +54,13 @@ def get_ads_num(query):
     q_i = queries.index(query)
     return graph[q_i]
 
-
 def get_queries_num(ad):
     a_j = ads.index(ad)
     return graph.transpose()[a_j]
 
-
 def get_ads(query):
     series = get_ads_num(query).tolist()[0]
     return [ ads[x] for x in range(len(series)) if series[x] > 0 ]
-
 
 def get_queries(ad):
     series = get_queries_num(ad).tolist()[0]
@@ -68,6 +68,9 @@ def get_queries(ad):
 
 
 def query_simrank(q1, q2, C):
+    """
+    in this, graph[q_i] -> connected ads
+    """
     if q1 == q2:
         return 1
 
@@ -84,6 +87,9 @@ def query_simrank(q1, q2, C):
 
 
 def ad_simrank(a1, a2, C):
+    """
+    in this, graph need to be transposed to make ad to be the index
+    """
     if a1 == a2:
         return 1
 
@@ -100,8 +106,8 @@ def ad_simrank(a1, a2, C):
 
 
 def simple_simrank(C=0.8, k=10):
-    """Simple SimRank iterations."""
-    for _ in range(k):
+
+    for run in range(k):
         # queries simrank
         new_query_sim = matrix(numpy.identity(len(queries)))
         for qi in queries:
@@ -122,7 +128,6 @@ def simple_simrank(C=0.8, k=10):
         ad_sim = new_ad_sim
 
     return query_sim, ad_sim
-
 
 def query_simrank_geometric(q1, q2):
     if q1 == q2:
@@ -189,7 +194,6 @@ def evidence_geometric(k=10):
     return query_sim, ad_sim
 
 
-
 def query_simrank_exponential(q1, q2):
     if q1 == q2:
         return 1
@@ -229,7 +233,7 @@ def ad_simrank_exponential(a1, a2):
 
 
 
-def evidence_exponential():
+def evidence_exponential(k=10):
     """Incorporate evidence - exponential."""
     for _ in range(k):
         # queries simrank
@@ -252,6 +256,10 @@ def evidence_exponential():
         ad_sim = new_ad_sim
 
     return query_sim, ad_sim
+
+
+
+
 
 
 def print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim):
@@ -294,12 +302,19 @@ def print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim):
     print(",".join(q_result))
     print(",".join(a_result))
 
+
 if __name__ == '__main__':
     # print(queries)
     # print(ads)
     query_sim, ad_sim = simple_simrank()
-    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
     # print(query_sim)
     # print(ad_sim)
+    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
+
     query_sim, ad_sim = evidence_geometric()
+    # print(query_sim)
+    # print(ad_sim)
+    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
+
+    query_sim, ad_sim = evidence_exponential()
     print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
