@@ -28,7 +28,7 @@ Note `U1` is a user-id, while `A1` is the advertisement-id for a specific displa
 
 ### Task One - Simple SimRank iterations
 
-**Implement conventional SimRank and compute the similarities of users to each other and ads to other ads**. You need to use the partial sums trick described in the links provided with the assignment description in your implementation. Initialize the algorithm with the usual procedure (similarity of a node to itself is 1 and 0 to all others), and perform K=10 iterations of User and Ad-similarity updates (start with user similarity updates). The constants C1 and C2 are both set to 0.8. Let us call the similarity scores obtained after K=10 iterations simple\_simrank\_scores.
+**Implement conventional SimRank and compute the similarities of users to each other and ads to other ads**. You need to use the partial sums trick described in the links provided with the assignment description in your implementation. Initialize the algorithm with the usual procedure (similarity of a node to itself is `1` and `0` to all others), and perform `K=10` iterations of User and Ad-similarity updates (start with user similarity updates). The constants C1 and C2 are both set to `0.8`. Let us call the similarity scores obtained after K=10 iterations simple\_simrank\_scores.
 
 ### Task Two - Incorporate evidence
 
