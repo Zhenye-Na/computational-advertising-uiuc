@@ -8,209 +8,320 @@ ref: https://en.wikipedia.org/wiki/SimRank
 """
 
 import sys
+import math
+import numpy
+from numpy import matrix
 
-k = 10
-c1 = c2 = 0.8
-
-def simple_simrank(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad):
-    """
-    Simple SimRank iterations.
-
-    Args:
-        users
-        ads
-        users_sim_scores
-        ads_sim_scores
-        users_partial_sum
-        ads_partial_sum
-        query_user
-        query_ad
-    """
-    # memoization for ads partial sum
-    for users_key, users_score_val in users_sim_scores.items():
-        user_list = users.keys()
-
-        for q_prime in user_list:
-            similarity_score = 0.
-            for q in user_list:
-                similarity_score += ads_sim_scores["{},{}".format(q, q_prime)]
-            ads_partial_sum[q_prime] = similarity_score
-
-    # memoization for users partial sum
-    for ads_key, ads_score_val in ads_sim_scores.items():
-        ad_list = ads.keys()
-
-        for a_prime in ad_list:
-            similarity_score = 0.
-            for a in ad_list:
-                similarity_score += users_sim_scores["{},{}".format(a, a_prime)]
-            users_partial_sum[a_prime] = similarity_score
+from scipy import sparse
+from scipy.sparse import identity
 
 
-    # for users_key, users_score_val in users_sim_scores.items():
-    #     users_key_array = users_key.split(",")
-    #     users_key_array = [float(i) for i in users_key_array]
-    #
-    #     for q_prime_neighbors in users[users_key_array[1]]:
-    #         similarity_score = 0.
-    #         for q_neighbors in users[users_key_array[0]]:
-    #             similarity_score += ads_sim_scores["{},{}".format(q_neighbors, q_prime_neighbors)]
-    #         ads_partial_sum[q_prime_neighbors] = similarity_score
+num_of_links = int(sys.stdin.readline())
 
-    # # memoization for users partial sum
-    # for ads_key, ads_score_val in ads_sim_scores.items():
-    #     ads_key_array = ads_key.split(",")
-    #     ads_key_array = [float(i) for i in ads_key_array]
-    #
-    #     for a_prime_neighbors in ads[ads_key_array[1]]:
-    #         similarity_score = 0.
-    #         for a_neighbors in ads[ads_key_array[0]]:
-    #             similarity_score += users_sim_scores["{},{}".format(a_neighbors, a_prime_neighbors)]
-    #         users_partial_sum[a_prime_neighbors] = similarity_score
+logs = []
 
-    # update process
-    for i in range(k):
-        # Eq. 4.1
-        for users_key, users_score_val in users_sim_scores.items():
-            users_key_array = users_key.split(",")
-            users_key_array = [float(i) for i in users_key_array]
+for _ in range(num_of_links):
+    log = sys.stdin.readline()
+    logs.append(log)
 
-            factor = c1 / (len(users[users_key_array[0]]) * len(users[users_key_array[1]]))
-
-            new_sim_score = 0.
-            for q_prime_neighbors in users[users_key_array[1]]:
-                new_sim_score += ads_partial_sum[q_prime_neighbors]
-
-            users_sim_scores["{},{}".format(users_key_array[0], users_key_array[1])] = factor * new_sim_score
-
-        # Eq. 4.2
-        for ads_key, ads_score_val in ads_sim_scores.items():
-            ads_key_array = ads_key.split(",")
-            ads_key_array = [int(i) for i in ads_key_array]
-
-            factor = c2 / (len(ads[ads_key_array[0]]) * len(ads[ads_key_array[1]]))
-
-            new_sim_score = 0.
-            for a_prime_neighbors in ads[ads_key_array[1]]:
-                new_sim_score += users_partial_sum[a_prime_neighbors]
-
-            ads_sim_scores["{},{}".format(ads_key_array[0], ads_key_array[1])] = factor * new_sim_score
+query = sys.stdin.readline().split(",")
+query_user = query[0]
+query_ad = query[1]
 
 
-    query_user_neighbors = users[query_user]
-    user_rank = []
-    for neighbor in query_user_neighbors:
-        user_rank.append(neighbor, users_sim_scores["{},{}".format(query_user, neighbor)])
+logs_tuple = [tuple(log.split(",")) for log in logs]
 
-    user_rank.sort(key=lambda sl: (-sl[1], sl[0]))
+queries = list(set([log[0] for log in logs_tuple]))
+ads = list(set([log[1] for log in logs_tuple]))
 
-    user_result = []
-    for i in range(3):
-        user_result.append(str(user_rank[i][0]))
+# Graph means the relations number
+graph = matrix(numpy.zeros([len(queries), len(ads)]))
 
-        print(",".join(user_result))
+# create graph
+for log in logs_tuple:
+    query = log[0]
+    ad = log[1]
+    q_i = queries.index(query)
+    a_j = ads.index(ad)
+    graph[q_i, a_j] += 1
+
+sgraph = sparse.csr_matrix(graph)
+
+# similarity scores
+# query_sim = matrix(numpy.identity(len(queries)))
+# ad_sim = matrix(numpy.identity(len(ads)))
+query_sim = identity(len(queries))
+ad_sim = identity(len(ads))
 
 
+def get_ads_num(query):
+    """Get number of ads."""
+    q_i = queries.index(query)
+    return sgraph.todense()[q_i]
 
-def evidence_geometric():
+
+def get_queries_num(ad):
+    """Get number of queries."""
+    a_j = ads.index(ad)
+    return sgraph.todense().transpose()[a_j]
+
+
+def get_ads(query):
+    """Get all the ads."""
+    series = get_ads_num(query).tolist()[0]
+    return [ads[x] for x in xrange(len(series)) if series[x] > 0]
+
+
+def get_queries(ad):
+    """Get all the queries."""
+    series = get_queries_num(ad).tolist()[0]
+    return [queries[x] for x in xrange(len(series)) if series[x] > 0]
+
+
+def query_simrank(ad_sim, q1, q2, C):
+    """Simple SimRank of queries."""
+    if q1 == q2:
+        return 1
+
+    prefix = C / (get_ads_num(q1).sum() * get_ads_num(q2).sum())
+    postfix = 0
+
+    for ad_i in get_ads(q1):
+        for ad_j in get_ads(q2):
+            i = ads.index(ad_i)
+            j = ads.index(ad_j)
+            postfix += ad_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def ad_simrank(query_sim, a1, a2, C):
+    """Simple SimRank of ads."""
+    if a1 == a2:
+        return 1
+
+    prefix = C / (get_queries_num(a1).sum() * get_queries_num(a2).sum())
+    postfix = 0
+
+    for query_i in get_queries(a1):
+        for query_j in get_queries(a2):
+            i = queries.index(query_i)
+            j = queries.index(query_j)
+            postfix += query_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def simple_simrank(ad_sim, query_sim, C=0.8, k=10):
+    """Simple SimRank algorithm."""
+    new_query_sim = matrix(numpy.identity(len(queries)))
+    new_ad_sim = matrix(numpy.identity(len(ads)))
+
+    for run in range(k):
+        # queries simrank
+        # new_query_sim = matrix(numpy.identity(len(queries)))
+        for qi in queries:
+            for qj in queries:
+                i = queries.index(qi)
+                j = queries.index(qj)
+                new_query_sim[i, j] = query_simrank(ad_sim, qi, qj, C)
+
+        # ads simrank
+        # new_ad_sim = matrix(numpy.identity(len(ads)))
+        for ai in ads:
+            for aj in ads:
+                i = ads.index(ai)
+                j = ads.index(aj)
+                new_ad_sim[i, j] = ad_simrank(query_sim, ai, aj, C)
+
+        query_sim = new_query_sim
+        ad_sim = new_ad_sim
+
+    return query_sim, ad_sim
+
+
+def query_simrank_geometric(ad_sim, q1, q2):
+    """Normalized weights with geometric spread."""
+    if q1 == q2:
+        return 1
+
+    prefix = 0.
+    num = numpy.sum(get_ads_num(q1) == get_ads_num(q2))
+    for i in range(1, num + 1):
+        prefix += 1 / math.pow(2, i)
+
+    postfix = 0
+    for ad_i in get_ads(q1):
+        for ad_j in get_ads(q2):
+            i = ads.index(ad_i)
+            j = ads.index(ad_j)
+            postfix += ad_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def ad_simrank_geometric(query_sim, a1, a2):
+    if a1 == a2:
+        return 1
+
+    prefix = 0.
+    num = numpy.sum(get_queries_num(a1) == get_queries_num(a2))
+    for i in range(1, num + 1):
+        prefix += 1 / math.pow(2, i)
+    # print("ad_simrank_geometric ->", prefix)
+    postfix = 0
+
+    for query_i in get_queries(a1):
+        for query_j in get_queries(a2):
+            i = queries.index(query_i)
+            j = queries.index(query_j)
+            postfix += query_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def evidence_geometric(ad_sim, query_sim, k=10):
     """Incorporate evidence - geometric."""
-    pass
+    new_query_sim = matrix(numpy.identity(len(queries)))
+    new_ad_sim = matrix(numpy.identity(len(ads)))
+
+    for _ in range(k):
+        # queries simrank
+        for qi in queries:
+            for qj in queries:
+                i = queries.index(qi)
+                j = queries.index(qj)
+                new_query_sim[i, j] = query_simrank_geometric(ad_sim, qi, qj)
+
+        # ads simrank
+        for ai in ads:
+            for aj in ads:
+                i = ads.index(ai)
+                j = ads.index(aj)
+                new_ad_sim[i, j] = ad_simrank_geometric(query_sim, ai, aj)
+
+        query_sim = new_query_sim
+        ad_sim = new_ad_sim
+
+    return query_sim, ad_sim
 
 
+def query_simrank_exponential(ad_sim, q1, q2):
+    if q1 == q2:
+        return 1
 
-def evidence_exponential():
+    prefix = 0.
+    num = numpy.sum(get_ads_num(q1) == get_ads_num(q2))
+    prefix = 1 - math.exp(-num)
+    # print("query_simrank_exponential ->", prefix)
+    postfix = 0
+
+    for ad_i in get_ads(q1):
+        for ad_j in get_ads(q2):
+            i = ads.index(ad_i)
+            j = ads.index(ad_j)
+            postfix += ad_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def ad_simrank_exponential(query_sim, a1, a2):
+    if a1 == a2:
+        return 1
+
+    prefix = 0.
+    num = numpy.sum(get_queries_num(a1) == get_queries_num(a2))
+    prefix = 1 - math.exp(-num)
+    # print("ad_simrank_exponential ->", prefix)
+    postfix = 0
+
+    for query_i in get_queries(a1):
+        for query_j in get_queries(a2):
+            i = queries.index(query_i)
+            j = queries.index(query_j)
+            postfix += query_sim.todense()[i, j]
+
+    return prefix * postfix
+
+
+def evidence_exponential(ad_sim, query_sim, k=10):
     """Incorporate evidence - exponential."""
-    pass
+
+    new_query_sim = matrix(numpy.identity(len(queries)))
+    new_ad_sim = matrix(numpy.identity(len(ads)))
+
+    # query_sim = new_query_sim
+    # ad_sim = new_ad_sim
+
+    for _ in range(k):
+        # queries simrank
+        # new_query_sim = matrix(numpy.identity(len(queries)))
+        for qi in queries:
+            for qj in queries:
+                i = queries.index(qi)
+                j = queries.index(qj)
+                new_query_sim[i, j] = query_simrank_exponential(ad_sim, qi, qj)
+
+        # ads simrank
+        # new_ad_sim = matrix(numpy.identity(len(ads)))
+        for ai in ads:
+            for aj in ads:
+                i = ads.index(ai)
+                j = ads.index(aj)
+                new_ad_sim[i, j] = ad_simrank_exponential(query_sim, ai, aj)
+
+        query_sim = new_query_sim
+        ad_sim = new_ad_sim
+
+    return query_sim, ad_sim
 
 
-def main(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad):
-    """
-    Pipleline of SimRank algorithm.
+def print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim):
+    """Print result."""
+    # for query
+    q_i = queries.index(query_user)
+    a_j = ads.index(query_ad)
 
-    Args:
-        users
-        ads
-        users_sim_scores
-        ads_sim_scores
-        users_partial_sum
-        ads_partial_sum
+    query_sim_list = query_sim.tolist()
+    ad_sim_list = ad_sim.tolist()
 
-    """
-    simple_simrank(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad)
-    evidence_geometric(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad)
-    evidence_exponential(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad)
+    target_query_list = query_sim_list[q_i]
+    target_ad_list = ad_sim_list[a_j]
+
+    queries_int = [int(i) for i in queries]
+    query_list = list(zip(target_query_list, queries_int))
+
+    ads_int = [int(i) for i in ads]
+    ad_list = list(zip(target_ad_list, ads_int))
+
+    query_list.sort(key=lambda sl: (-sl[0], sl[1]))
+    ad_list.sort(key=lambda sl: (-sl[0], sl[1]))
+
+    q_result = []
+    for i in range(len(query_list)):
+        if str(query_list[i][1]) != query_user:
+            q_result.append(str(query_list[i][1]))
+            if len(q_result) == 3:
+                break
+
+    a_result = []
+    for i in range(len(ad_list)):
+        if str(ad_list[i][1]) != query_ad:
+            a_result.append(str(ad_list[i][1]))
+            if len(a_result) == 3:
+                break
+
+    print(",".join(q_result))
+    print(",".join(a_result))
 
 
 if __name__ == '__main__':
-    num_of_links = int(sys.stdin.readline())
 
-    # dictionary of users, mapping from users to ads
-    users = {}
+    query_sim, ad_sim = simple_simrank(ad_sim, query_sim, )
+    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
 
-    # dictionary of ads, mapping from ads to users
-    ads = {}
+    query_sim, ad_sim = evidence_geometric(ad_sim, query_sim)
+    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
 
-    # dictionary of weights, link weights
-    weights = {}
-
-    # similarity scores for users
-    users_sim_scores = {}
-
-    # similarity scores for ads
-    ads_sim_scores = {}
-
-    # partial sum memoization for users
-    users_partial_sum = {}
-
-    # partial sum memoization for ads
-    ads_partial_sum = {}
-
-    user_list = []
-    ad_list = []
-
-    for _ in range(num_of_links):
-        line = sys.stdin.readline().split(",")
-        line_array = [float(i) for i in line]
-
-        user_list.append(line_array[0])
-        ad_list.append(line_array[1])
-
-        if line_array[0] in users:
-            users[line_array[0]].append(line_array[1])
-        else:
-            users[line_array[0]] = [line_array[1]]
-
-        users_sim_scores["{},{}".format(line_array[0], line_array[0])] = 1.
-        # users_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
-        # users_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
-
-        if line_array[1] in ads:
-            ads[line_array[1]].append(line_array[0])
-        else:
-            ads[line_array[1]] = [line_array[0]]
-
-        ads_sim_scores["{},{}".format(line_array[1], line_array[1])] = 1.
-        # ads_sim_scores["{},{}".format(line_array[1], line_array[0])] = 0.
-        # ads_sim_scores["{},{}".format(line_array[0], line_array[1])] = 0.
-
-        weights["{},{}".format(line_array[0], line_array[1])] = line_array[2]
-
-    for q in user_list:
-        for q_prime in user_list:
-            users_sim_scores["{},{}".format(q, q_prime)] = 0.
-            users_sim_scores["{},{}".format(q_prime, q)] = 0.
-
-    for a in ad_list:
-        for a_prime in ad_list:
-            ads_sim_scores["{},{}".format(a, a_prime)] = 0.
-            ads_sim_scores["{},{}".format(a_prime, a)] = 0.
-
-
-    # query user and ad
-    line = sys.stdin.readline().split(",")
-    line_array = [int(i) for i in line]
-    query_user = line_array[0]
-    query_ad = line_array[1]
-
-
-    main(users, ads, users_sim_scores, ads_sim_scores, users_partial_sum, ads_partial_sum, query_user, query_ad)
+    query_sim, ad_sim = evidence_exponential(ad_sim, query_sim, )
+    print_result_simple_simrank(query_user, query_ad, query_sim, ad_sim)
