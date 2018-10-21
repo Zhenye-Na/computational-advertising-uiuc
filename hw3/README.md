@@ -8,17 +8,14 @@ The problem statement is given in this Assignment File which has been attached i
 
 The input contains the (user,movie) rating information, movie metadata and the (user,movie) pair for which you need to estimate the rating.
 
-The first line of the input contains 2 space seperated integers R M. R is the number of lines of rating information. M is the number of movies.
+- The first line of the input contains 2 space seperated integers `R` and `M`. `R` is the number of lines of rating information. `M` is the number of movies.
+- Next `R` lines contain the rating information. Each line will contain 3 space seperated values (`user id`, `movie id`, `rating`).
+- Next `M` lines contain the metadata information. The first word/value of each line is the movie id. The rest of the words are the metadata information about that movie.
+- The last line with contain 2 space seperated integers (target user id, target movie id) for which you need to estimate the rating.
 
-Next R lines contain the rating information. Each line will contain 3 space seperated values (user id, movie id, rating).
+Please refer to the [sample input 0](#sample-input-0) below.
 
-Next M lines contain the metadata information. The first word/value of each line is the movie id. The rest of the words are the metadata information about that movie.
-
-The last line with contain 2 space seperated integers (target user id, target movie id) for which you need to estimate the rating.
-
-Please refer to the sample input 0 below.
-
-There are 5 rating information lines and 5 movie metadata lines. You need to find the rating that user 1 would have given to movie 4.
+There are `5` rating information lines and `5` movie metadata lines. You need to find the rating that user `1` would have given to movie `4`.
 
 ### Constraints
 
