@@ -44,7 +44,6 @@ def read_input():
     M = int(first_line[1])
 
     user_ids = []
-    movie_ids = []
     ratings = []
 
     # R(m) is the set of users that have rated the movie m in the available dataset.
@@ -76,15 +75,15 @@ def read_input():
         else:
             Ru[user_id].append(movie_id)
 
-        movie_ids.append(movie_id)
         user_ids.append(user_id)
         ratings.append(rating)
 
-    movie_ids = list(set(movie_ids))
-    user_ids = list(set(user_ids))
-
     # µ is the global mean calculated across all the ratings available
     mu = sum(ratings) / len(ratings)
+    user_ids = set(user_ids)
+
+    global U
+    U = len(user_ids)
 
     movies = []
     for _ in range(M):
@@ -97,7 +96,7 @@ def read_input():
     target_user_id = int(last_line[0])
     target_movie_id = int(last_line[1])
 
-    return target_user_id, target_movie_id, user_ids, movie_ids, ratings, rating_dict, Rm, Ru, mu, movies
+    return target_user_id, target_movie_id, rating_dict, Rm, Ru, mu, movies
 
 
 def tf(t, m):
@@ -146,8 +145,7 @@ def calculate_similarity(d_m, d_j):
 
 def main():
     """Main pipeline for Recommender Systems."""
-    target_user_id, target_movie_id, user_id, movie_id, rating, rating_dict, Rm, Ru, mu, movies = read_input()
-    U = len(user_id)
+    target_user_id, target_movie_id, rating_dict, Rm, Ru, mu, movies = read_input()
 
     # rating matrix row -> users, column -> movies
     rating_matrix = np.ones((U + 1, M + 1)) * -1
@@ -157,53 +155,36 @@ def main():
         m = int(key_array[1])
         rating_matrix[u][m] = val
 
-    print("rating_matrix")
-    print(rating_matrix)
-    print("=======================")
-
-    if rating_matrix[target_user_id][target_movie_id] != -1:
-        return rating_matrix[target_user_id][target_movie_id]
+    num_of_row = rating_matrix.shape[0]
+    num_of_col = rating_matrix.shape[1]
+    # s_rating_matrix = sparse.csr_matrix(rating_matrix)
 
     # For the (u, m) pairs not present in the data, we will use the formula below
-
     b_m = {}
-    for u_ in range(1, rating_matrix.shape[0]):
-        for m_ in range(1, rating_matrix.shape[1]):
-            # if ``rating_matrix[u_][m_] == -1`` means no ratings for this (u, m) pair
-            if rating_matrix[u_][m_] == -1:
-
+    for u_ in range(1, num_of_row):
+        for m_ in range(1, num_of_col):
             # Equation 3.
             # |R(m)|: how many users have rated this movie
-                len_rm = len(Rm[m_])
-                r_um = np.asscalar(rating_matrix.sum(axis=0)[m_])
-                b_m[m_] = (r_um - len_rm * mu) / len_rm
+            column = rating_matrix[1:, m_][rating_matrix[1:, m_] != -1]
+            length = len(column)
+            s_r_um = np.sum(column)
+            b_m[m_] = (s_r_um - length * mu) / length
 
-    print("bm")
-    print(b_m)
-    print("=======================")
-    
     b_u = {}
-    for u_ in range(1, rating_matrix.shape[0]):
-        for m_ in range(1, rating_matrix.shape[1]):
+    for u_ in range(1, num_of_row):
+        for m_ in range(1, num_of_col):
             # Equation 4.
             # |R(u)|: how many movies this user rated
             if rating_matrix[u_][m_] == -1:
-                len_ru = len(Ru[u_])
-                r_um = np.asscalar(rating_matrix.sum(axis=1)[u_])
+                row = rating_matrix[u_, 1:][rating_matrix[u_, 1:] != -1]
+                s_r_um = np.sum(row)
+                length = len(row)
                 b_m_sum = 0
                 for movie in Ru[u_]:
-                    if movie in b_m:
-                        b_m_sum += b_m[movie]
-                    else:
-                        b_m[movie] = np.sum(rating_matrix[:,m_][rating_matrix[:,m_] != -1] - mu)
-                        b_m_sum += b_m[movie]
+                    # if movie in b_m:
+                    b_m_sum += b_m[movie]
+                b_u[u_] = (s_r_um - length * mu - b_m_sum) / length
 
-                b_u[u_] = (r_um - len_ru * mu - b_m_sum) / len_ru
-
-    print("bu")
-    print(b_u)
-    print("=======================")  
-                
     # Equation 2.
     b_um = np.zeros((U + 1, M + 1))
     for u_ in range(1, b_um.shape[0]):
@@ -217,16 +198,10 @@ def main():
 
     set_movie_names = list(set(movie_names.rstrip().split(" ")))
     matrix_movie_names = np.zeros((M + 1, len(set_movie_names)))
-    for m_ in range(1, matrix_movie_names.shape[0]):
+    for m_ in range(1, M + 1):
         for v_ in range(matrix_movie_names.shape[1]):
             matrix_movie_names[m_][v_] = tf(set_movie_names[v_], movies[m_ - 1].split(" ")) * idf(set_movie_names[v_ - 1], movies)
 
-    print(set_movie_names)
-    print(matrix_movie_names[1])
-    print("+++")
-    print(matrix_movie_names)
-    print("=======================")  
-    
     # Equation 1.
     result = b_um[target_user_id][target_movie_id]
     s_mj = np.zeros((M + 1, M + 1))
@@ -234,9 +209,6 @@ def main():
     for j in Ru[target_user_id]:
         s_mj[target_movie_id][j] = calculate_similarity(matrix_movie_names[target_movie_id], matrix_movie_names[j])
 
-    print(s_mj)
-    print("=======================")  
-        
     for j in Ru[target_user_id]:
         r_uj = rating_matrix[target_user_id][j]
         b_uj = b_um[target_user_id][j]
@@ -245,10 +217,8 @@ def main():
     down = 0.
     for j in Ru[target_user_id]:
         down += s_mj[target_movie_id][j]
-    print(result)
-    print(up)
-    print(down)
-    print(round(result * up / down, 1))
+
+    print(round(result + (up / down), 1))
 
 if __name__ == '__main__':
     main()

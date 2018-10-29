@@ -85,7 +85,8 @@ def read_input():
 
     # µ is the global mean calculated across all the ratings available
     mu = sum(ratings) / len(ratings)
-
+    print("mu: ", mu)
+    
     movies = []
     for _ in range(M):
         meta_info = sys.stdin.readline().rstrip("\n").split(" ")
@@ -160,7 +161,7 @@ def main():
     print("rating_matrix")
     print(rating_matrix)
     print("=======================")
-
+        
     if rating_matrix[target_user_id][target_movie_id] != -1:
         return rating_matrix[target_user_id][target_movie_id]
 
@@ -227,13 +228,20 @@ def main():
     print(matrix_movie_names)
     print("=======================")  
     
+    print("b_um")
+    print(b_um)
+    print("=======================")  
+    
     # Equation 1.
     result = b_um[target_user_id][target_movie_id]
     s_mj = np.zeros((M + 1, M + 1))
     up = 0.
     for j in Ru[target_user_id]:
+        print(j)
         s_mj[target_movie_id][j] = calculate_similarity(matrix_movie_names[target_movie_id], matrix_movie_names[j])
-
+        print(s_mj[target_movie_id][j])
+        
+    print("smj")
     print(s_mj)
     print("=======================")  
         
